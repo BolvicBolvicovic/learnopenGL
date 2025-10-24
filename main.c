@@ -175,17 +175,17 @@ main(int ac, char** av)
 	float	vertices[] =
 	{
 		//x     y     z		colors
-		 0.7,  0.7,  0.0,  1.0, 0.0, 0.0,	// top right
-    	 0.7, -0.7,  0.0,  0.0, 1.0, 0.0,	// bottom right
+		 1.0,  1.0,  0.0,  1.0, 0.0, 0.0,	// top right
+    	 1.0, -1.0,  0.0,  0.0, 1.0, 0.0,	// bottom right
     	 0.0, -0.0,  0.0,  0.0, 0.0, 1.0,	// center
-    	-0.7, -0.7,  0.0,  0.0, 1.0, 0.0,	// bottom left
-    	-0.7,  0.7,  0.0,  1.0, 0.0, 0.0	// top left
+    	-1.0, -1.0,  0.0,  0.0, 1.0, 0.0,	// bottom left
+    	-1.0,  1.0,  0.0,  1.0, 0.0, 0.0	// top left
 	};
 
 	uint32_t	indices[] =
 	{
-		2, 1, 0,	// first triangle
-		2, 3, 4		// second triangle
+		0, 1, 3,	// first triangle
+		0, 4, 3		// second triangle
 	};
 
 	// Note: Init vertex array object
