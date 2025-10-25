@@ -4,15 +4,24 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 #define WIN_WIDTH					1024
 #define WIN_HEIGHT					768
 #define APP_NAME					("Learn")
+#define IMG_NAME1					("waterfall.png")
+#define IMG_NAME2					("composition7.jpeg")
 #define MAX_SHADER_SIZE				0x2000
 
+#define VEC2						2
+#define VEC2_FLOAT_STRIDE			(VEC2 * sizeof(float))
 #define VEC3						3
 #define VEC3_FLOAT_STRIDE			(VEC3 * sizeof(float))
+#define VERTEX_STRIDE				(VEC3_FLOAT_STRIDE * 2 + VEC2_FLOAT_STRIDE)
 #define LOCATION_VERTEX_ATTR_POS	0
 #define LOCATION_VERTEX_ATTR_COLOR	1
+#define LOCATION_VERTEX_ATTR_TEXT	2
 
 static inline uint32_t
 compile_shader_program(const char* vertex_path, const char* fragment_path)
@@ -174,12 +183,12 @@ main(int ac, char** av)
 
 	float	vertices[] =
 	{
-		//x     y     z		colors
-		 1.0,  1.0,  0.0,  1.0, 0.0, 0.0,	// top right
-    	 1.0, -1.0,  0.0,  0.0, 1.0, 0.0,	// bottom right
-    	 0.0, -0.0,  0.0,  0.0, 0.0, 1.0,	// center
-    	-1.0, -1.0,  0.0,  0.0, 1.0, 0.0,	// bottom left
-    	-1.0,  1.0,  0.0,  1.0, 0.0, 0.0	// top left
+		//x     y     z		colors			texture coord
+		 1.0,  1.0,  0.0,  1.0, 0.0, 0.0,  1.0, 1.0,		// top right
+    	 1.0, -1.0,  0.0,  0.0, 1.0, 0.0,  1.0, 0.0,		// bottom right
+    	 0.0, -0.0,  0.0,  0.0, 0.0, 1.0,  0.5, 0.5,		// center
+    	-1.0, -1.0,  0.0,  0.0, 1.0, 1.0,  0.0, 0.0,		// bottom left
+    	-1.0,  1.0,  0.0,  1.0, 0.0, 1.0,  0.0, 1.0			// top left
 	};
 
 	uint32_t	indices[] =
@@ -189,17 +198,14 @@ main(int ac, char** av)
 	};
 
 	// Note: Init vertex array object
-	uint32_t	vao;
+	// Note: Init vertex buffer object
+	// Note: Init element buffer object
+	uint32_t	vao, vbo, ebo;
 	glGenVertexArrays(1, &vao);
+	glGenBuffers(1, &vbo);
+	glGenBuffers(1, &ebo);
 	glBindVertexArray(vao);
 
-	// Note: Init vertex buffer object
-	uint32_t	vbo;
-	glGenBuffers(1, &vbo);
-
-	// Note: Init element buffer object
-	uint32_t	ebo;
-	glGenBuffers(1, &ebo);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -207,13 +213,14 @@ main(int ac, char** av)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
+
 	// Set aPos
 	glVertexAttribPointer(
 		LOCATION_VERTEX_ATTR_POS,
 		VEC3,
 		GL_FLOAT,
 		GL_FALSE,
-		VEC3_FLOAT_STRIDE * 2,
+		VERTEX_STRIDE,
 		// Note: This is an offset that is a void* for some reason
 		(void*)0
 	);
@@ -225,14 +232,92 @@ main(int ac, char** av)
 		VEC3,
 		GL_FLOAT,
 		GL_FALSE,
-		VEC3_FLOAT_STRIDE * 2,
+		VERTEX_STRIDE,
 		(void*)VEC3_FLOAT_STRIDE
 	);
 	glEnableVertexAttribArray(LOCATION_VERTEX_ATTR_COLOR);
 
+	// Set aTexCoord
+	glVertexAttribPointer(
+		LOCATION_VERTEX_ATTR_TEXT,
+		VEC2,
+		GL_FLOAT,
+		GL_FALSE,
+		VERTEX_STRIDE,
+		(void*)(VEC3_FLOAT_STRIDE * 2)
+	);
+	glEnableVertexAttribArray(LOCATION_VERTEX_ATTR_TEXT);
+
+	uint32_t	texture1, texture2;
+	glGenTextures(1, &texture1);
+	glGenTextures(1, &texture2);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture1);
+	
+	// Set texture attributes
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	
+	stbi_set_flip_vertically_on_load(1);
+	int			image_width, image_height, nr_channels;
+	uint8_t*	data = stbi_load(IMG_NAME1, &image_width, &image_height, &nr_channels, 0);
+
+	if (data)
+	{
+		GLenum	format = (nr_channels == 4) ? GL_RGBA : GL_RGB;
+		glTexImage2D(
+			GL_TEXTURE_2D, 
+			0, 
+			format, 
+			image_width,
+			image_height,
+			0,
+			format,
+			GL_UNSIGNED_BYTE,
+			data
+		);
+		glGenerateMipmap(GL_TEXTURE_2D);
+		stbi_image_free(data);
+	}
+	else
+	{
+		printf("Failed to load texture\n");
+		return 1;
+	}
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, texture2);
+	data = stbi_load(IMG_NAME2, &image_width, &image_height, &nr_channels, 0);
+
+	if (data)
+	{
+		GLenum	format = (nr_channels == 4) ? GL_RGBA : GL_RGB;
+		glTexImage2D(
+			GL_TEXTURE_2D, 
+			0, 
+			format, 
+			image_width,
+			image_height,
+			0,
+			format,
+			GL_UNSIGNED_BYTE,
+			data
+		);
+		glGenerateMipmap(GL_TEXTURE_2D);
+		stbi_image_free(data);
+	}
+	else
+	{
+		printf("Failed to load texture\n");
+		return 1;
+	}
+
 	// Note: Unbind buffer and array (optional)
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
+	// glBindBuffer(GL_ARRAY_BUFFER, 0);
+	// glBindVertexArray(0);
 
 	// Note: Draw wireframe polygone (optional)
 	// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -240,6 +325,8 @@ main(int ac, char** av)
 	// Note: Uniforms
 	int	u_Resolution	= glGetUniformLocation(shader_program, "u_Resolution");
 	int	u_Time			= glGetUniformLocation(shader_program, "u_Time");
+	int	u_Texture1		= glGetUniformLocation(shader_program, "u_Texture1");
+	int	u_Texture2		= glGetUniformLocation(shader_program, "u_Texture2");
 
 	// Note: Main loop
 	while (!glfwWindowShouldClose(window))
@@ -249,12 +336,18 @@ main(int ac, char** av)
 		glClearColor(0.0, 0.0, 0.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		// Note: Set variable uniform here
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texture1);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, texture2);
 
 		glUseProgram(shader_program);
 
+		// Note: Set variable uniform here
 		glUniform2f(u_Resolution, WIN_WIDTH, WIN_HEIGHT);
 		glUniform1f(u_Time, glfwGetTime());
+		glUniform1i(u_Texture1, 0);
+		glUniform1i(u_Texture2, 1);
 
 		glBindVertexArray(vao);
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
